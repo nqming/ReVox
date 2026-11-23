@@ -262,5 +262,4 @@ ReVox builds upon the open-source research of:
 - [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) — CTranslate2 Multilingual ASR
 - [VIVOS](https://huggingface.co/datasets/vivos), [Google FLEURS](https://huggingface.co/datasets/google/fleurs), and [FPT Open Speech](https://huggingface.co/datasets/doof-ferb/fpt_fosd)
 
----
 
