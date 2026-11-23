@@ -1,0 +1,56 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables, credentials & private files
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.secret
+secrets.*
+credentials.*
+*.local
+
+# Python & test caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Model weights & local caches (auto-downloaded on first run)
+models_cache/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.safetensors
+
+# Downloaded datasets & generated audio files
+data/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# Gradio, IDE & OS artifacts
+.gradio/
+flagged/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
