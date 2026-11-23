@@ -264,6 +264,3 @@ ReVox builds upon the open-source research of:
 
 ---
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/nqming">nqming</a> • Released under the <a href="LICENSE">MIT License</a></sub>
-</div>
