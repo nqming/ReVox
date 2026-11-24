@@ -135,16 +135,16 @@ class NeuralVCEngine:
     def extract_matching_pool(
         self,
         utterance_paths: Sequence[str | Path],
-        max_frames: int = 7500,
+        max_frames: int = 8500,
     ) -> torch.Tensor:
         """
-        Extract dense voiced WavLM-Large Layer-6 frames across 50-70 utterances (~2.5-3 minutes)
-        of a target speaker so virtually all Vietnamese syllables, codas, and 6 tones are covered.
+        Extract clean per-utterance WavLM-Large Layer-6 frames (untrimmed so unvoiced consonants
+        k/t/p/s/kh/th, stop closures, and utterance-level LayerNorm stay 100% intact).
         """
         chunks: list[torch.Tensor] = []
         total_frames = 0
         for p in utterance_paths:
-            feats = self.extract_wavlm_features(p, trim_silence=True)
+            feats = self.extract_wavlm_features(p, trim_silence=False)
             chunks.append(feats.cpu())
             total_frames += int(feats.shape[0])
             if total_frames >= max_frames:
@@ -164,22 +164,23 @@ class NeuralVCEngine:
         matching_pool: torch.Tensor,
         topk: int = 4,
         triphone_context: bool = True,
-        phonetic_anchor_min: float = 0.10,
-        phonetic_anchor_max: float = 0.24,
+        phonetic_anchor_min: float = 0.25,
+        phonetic_anchor_max: float = 0.40,
+        std_floor: float = 0.20,
     ) -> torch.Tensor:
         """
-        High-intelligibility Triphone Context kNN-VC with Adaptive AdaIN Phonetic Preservation:
-        1. Hybrid raw + speaker-demeaned cosine similarity removes cross-gender vocal-tract bias.
-        2. 3-frame diagonal triphone smoothing `[t-1, t, t+1]` enforces coarticulatory & tonal continuity.
-        3. Adaptive AdaIN phonetic residual prevents consonant/diphthong slurring on rare syllables.
+        High-intelligibility Triphone Context kNN-VC with Regularized AdaIN Phonetic Preservation:
+        1. Hybrid raw (65%) + speaker-demeaned (35%) cosine similarity removes vocal-tract bias.
+        2. Gentle 3-frame diagonal triphone smoothing `[0.15, 0.70, 0.15]` preserves coarticulation & tones.
+        3. Variance-floored AdaIN phonetic guidance keeps consonants, diphthongs & rare words crisp
+           while preserving strong ECAPA-TDNN speaker anonymization.
         """
         q = query_features.squeeze(0).float()
         m = matching_pool.squeeze(0).to(device=q.device, dtype=torch.float32)
 
-        # 1. Hybrid cosine similarity (70% raw + 30% speaker-demeaned for cross-gender accuracy)
         q_norm = F.normalize(q, p=2, dim=-1)
         m_norm = F.normalize(m, p=2, dim=-1)
-        sim_raw = torch.matmul(q_norm, m_norm.transpose(0, 1))  # (T, N)
+        sim_raw = torch.matmul(q_norm, m_norm.transpose(0, 1))
 
         mu_q = q.mean(dim=0, keepdim=True)
         mu_m = m.mean(dim=0, keepdim=True)
@@ -187,33 +188,29 @@ class NeuralVCEngine:
         m_dem = F.normalize(m - mu_m, p=2, dim=-1)
         sim_dem = torch.matmul(q_dem, m_dem.transpose(0, 1))
 
-        sim = 0.70 * sim_raw + 0.30 * sim_dem
+        sim = 0.65 * sim_raw + 0.35 * sim_dem
 
-        # 2. Triphone diagonal temporal context [t-1, t, t+1] -> preserves syllables & tone contours
         if triphone_context and sim.shape[0] >= 3 and sim.shape[1] >= 3:
             sim_ctx = sim.clone()
             sim_ctx[1:-1, 1:-1] = (
-                0.18 * sim[:-2, :-2]
-                + 0.64 * sim[1:-1, 1:-1]
-                + 0.18 * sim[2:, 2:]
+                0.15 * sim[:-2, :-2]
+                + 0.70 * sim[1:-1, 1:-1]
+                + 0.15 * sim[2:, 2:]
             )
             sim = sim_ctx
 
         eff_k = min(int(topk), int(m.shape[0]))
         top_sims, top_indices = torch.topk(sim, k=eff_k, dim=-1, largest=True, sorted=True)
 
-        # Uniform average of top-k matches prematch_g_02500000.pt training manifold
-        knn_matched = m[top_indices].mean(dim=1)  # (T, 1024)
+        knn_matched = m[top_indices].mean(dim=1)
 
-        # 3. Adaptive AdaIN phonetic guidance for crisp consonants & rare words
         if phonetic_anchor_max > 0.0:
-            std_q = q.std(dim=0, keepdim=True) + 1e-6
-            std_m = m.std(dim=0, keepdim=True) + 1e-6
+            std_q = torch.clamp(q.std(dim=0, keepdim=True), min=std_floor)
+            std_m = torch.clamp(m.std(dim=0, keepdim=True), min=std_floor)
             q_adain = ((q - mu_q) / std_q) * std_m + mu_m
 
-            # Higher confidence match -> smaller beta; rare phoneme (lower sim) -> higher beta up to max
             best_sim = top_sims[:, 0:1].clamp(0.45, 0.90)
-            lack_of_match = (0.90 - best_sim) / 0.45  # in [0, 1]
+            lack_of_match = (0.90 - best_sim) / 0.45
             beta = phonetic_anchor_min + (phonetic_anchor_max - phonetic_anchor_min) * lack_of_match
             matched = (1.0 - beta) * knn_matched + beta * q_adain
         else:

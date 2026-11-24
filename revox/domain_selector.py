@@ -37,7 +37,7 @@ DOMAIN_PROFILES: dict[str, DomainProfileSpec] = {
         display_name="🩺 Y tế & Tư vấn Tâm lý (Giọng trầm ấm, mượt)",
         short_description="Chọn giọng trầm ấm, mượt phổ cho hồ sơ bệnh án dài.",
         preserve_gender=None,
-        default_knn_topk=6,
+        default_knn_topk=4,
         allow_disable_rvox=False,
         default_embed_rvox=True,
     ),

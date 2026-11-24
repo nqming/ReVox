@@ -60,46 +60,26 @@ def _compute_acoustic_warmth_and_smoothness(
 def _extract_chunked_wavlm_pool(
     vc: NeuralVCEngine,
     wavs: list[np.ndarray],
-    max_frames: int = 5200,
+    max_frames: int = 8500,
 ) -> torch.Tensor:
     """
-    Concatenate trimmed voiced utterances into ~18-second macro-chunks (288,000 samples) to minimize
-    per-file convolution/padding overhead while preserving natural within-utterance triphone transitions.
+    Extract WavLM-Large Layer-6 features per utterance WITHOUT aggressive silence trimming.
+    Preserving unvoiced consonants (k, t, p, s, kh, th, ch), stop closures, and natural
+    utterance-level LayerNorm alignment dramatically improves Vietnamese word accuracy.
     """
-    trimmed = [trim_nonspeech_edges(w) for w in wavs]
-    trimmed = [w for w in trimmed if w.size >= 1600]
-    if not trimmed:
-        trimmed = wavs[:5]
-
-    chunk_samples_limit = TARGET_SR * 18
-    macro_chunks: list[np.ndarray] = []
-    cur_buf: list[np.ndarray] = []
-    cur_len = 0
-    sep_pause = np.zeros(int(TARGET_SR * 0.04), dtype=np.float32)
-
-    for w in trimmed:
-        cur_buf.append(w)
-        cur_buf.append(sep_pause)
-        cur_len += w.size + sep_pause.size
-        if cur_len >= chunk_samples_limit:
-            macro_chunks.append(np.concatenate(cur_buf, axis=0))
-            cur_buf = []
-            cur_len = 0
-        if (len(macro_chunks) * 18 * 50) >= max_frames + 200:
-            break
-
-    if cur_buf and (len(macro_chunks) * 18 * 50) < max_frames:
-        macro_chunks.append(np.concatenate(cur_buf, axis=0))
-
     feat_blocks: list[torch.Tensor] = []
     total_f = 0
-    for mc in macro_chunks:
-        f = vc.extract_wavlm_features(mc, sample_rate=TARGET_SR, trim_silence=False).cpu()
+    for w in wavs:
+        if w.size < TARGET_SR // 2:
+            continue
+        f = vc.extract_wavlm_features(w, sample_rate=TARGET_SR, trim_silence=False).cpu()
         feat_blocks.append(f)
         total_f += int(f.shape[0])
         if total_f >= max_frames:
             break
 
+    if not feat_blocks:
+        raise ValueError("Không trích xuất được đặc trưng WavLM từ danh sách câu mẫu.")
     pool = torch.cat(feat_blocks, dim=0)
     if pool.shape[0] > max_frames:
         pool = pool[:max_frames]
@@ -111,7 +91,7 @@ def build_target_pool_cache(
     output_cache_path: str | Path = MODELS_CACHE_DIR / "pool_cache.pt",
     vc_engine: NeuralVCEngine | None = None,
     biometrics_engine: SpeakerBiometricsEngine | None = None,
-    max_frames_per_speaker: int = 5200,
+    max_frames_per_speaker: int = 8500,
 ) -> dict[str, Any]:
     t_start = time.perf_counter()
     pool_path = Path(pool_dir)
@@ -256,7 +236,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build dense WavLM + ECAPA cache for ReVox target_pool.")
     parser.add_argument("--pool-dir", type=str, default=str(TARGET_POOL_DIR))
     parser.add_argument("--output", type=str, default=str(MODELS_CACHE_DIR / "pool_cache.pt"))
-    parser.add_argument("--max-frames", type=int, default=5200)
+    parser.add_argument("--max-frames", type=int, default=8500)
     args = parser.parse_args()
     build_target_pool_cache(
         pool_dir=args.pool_dir,

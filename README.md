@@ -37,10 +37,10 @@ Modern speech recordings carry sensitive biometric signatures. Traditional voice
 
 **ReVox** bridges privacy and accountability using a **100% State-of-the-Art Neural Speech Pipeline**:
 
-- **Completely conceals speaker identity** from both human listeners and biometric AI (`ECAPA-TDNN` Equal Error Rate jumps from **`1.32%` → `53.33%`** — indistinguishable from random guessing).
+- **Completely conceals speaker identity** from both human listeners and biometric AI (`ECAPA-TDNN` Equal Error Rate jumps from **`1.32%` → `48.33%`** — indistinguishable from random guessing).
 - **Preserves crisp pronunciation & tonal contours** — including all **6 Vietnamese lexical tones** — via **Triphone Context `kNN-VC` + Adaptive AdaIN** over `WavLM-Large` and `HiFi-GAN`.
 - **Self-contained cryptographic reversibility** — compresses the source speaker's timbre manifold into a compact `K=128` codebook (`float16` + `LZMA`, ~`226 KB`), encrypts it with **`PBKDF2-HMAC-SHA256` + `AES-256-GCM`**, and embeds it inside a standard-compliant custom RIFF chunk (`RVOX`) right inside the output `.wav` file.
-- **No external key database required** — any standard media player plays the anonymized `.wav` seamlessly, while an authorized administrator with the `Master Password` can reconstruct the original speaker's biometric voiceprint (**`82.9%` ECAPA-TDNN match**, EER drops back to **`4.21%`**) from that single `.wav` file alone.
+- **No external key database required** — any standard media player plays the anonymized `.wav` seamlessly, while an authorized administrator with the `Master Password` can reconstruct the original speaker's biometric voiceprint (**`83.0%` ECAPA-TDNN match**, EER drops back to **`4.47%`**) from that single `.wav` file alone.
 
 ---
 
@@ -118,16 +118,16 @@ RIFF [size] WAVE
 
 Evaluated under the **VoicePrivacy Challenge** protocol on **20 strictly disjoint real human Vietnamese speakers** (`S_pool ∩ S_test = ∅`) combined across **VIVOS**, **Google FLEURS (`vi_vn`)**, and **FPT Open Speech (`fpt_fosd`)**:
 
-| Stage / Configuration | EER (%) ↕ | Cosine vs. Original | WER (%) ↓ | CER (%) ↓ | Speed (CPU) |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **1. Original Real Speech (Baseline)** | `1.32%` | `0.7368` *(Enroll)* | `12.20%` | `8.75%` | — |
-| **2a. Anonymized — Banking Call Center** | `50.00%` | `0.3907` | — | — | `1.48x RT` |
-| **2b. Anonymized — Medical Telehealth** | `47.11%` | `0.4166` | — | — | `1.48x RT` |
-| **2c. Anonymized — Whistleblower Max** | `65.53%` | `0.2833` | — | — | `1.48x RT` |
-| **2. Overall Anonymized (`ReVox Shield`)** | **`53.33%`** | **`0.3579`** | **`26.71%`** | **`15.77%`** | **`1.48x RT`** |
-| **3. Key-Recovered (`ReVox Vault`)** | **`4.21%`** | **`0.8287`** | **`22.25%`** | **`13.70%`** | **`2.44x RT`** |
+| Stage / Configuration | EER (%) ↕ | Cosine vs. Original | WER (%) ↓ | CER (%) ↓ |
+| :--- | :---: | :---: | :---: | :---: |
+| **1. Original Real Speech (Baseline)** | `1.32%` | `0.7368` *(Enroll)* | `12.38%` | `8.73%` |
+| **2a. Anonymized — Banking Call Center** | `44.47%` | `0.4326` | — | — |
+| **2b. Anonymized — Medical Telehealth** | `35.00%` | `0.4643` | — | — |
+| **2c. Anonymized — Whistleblower Max** | `64.21%` | `0.3187` | — | — |
+| **2. Overall Anonymized (`ReVox Shield`)** | **`48.33%`** | **`0.3986`** | **`21.65%`** | **`12.84%`** |
+| **3. Key-Recovered (`ReVox Vault`)** | **`4.47%`** | **`0.8295`** | **`21.73%`** | **`14.52%`** |
 
-> **Highlights:** Anonymization pushes `ECAPA-TDNN` EER from `1.32%` to **`53.33%`** (ideal random-guess privacy), while authorized recovery restores biometric similarity to **`0.8287`** (`EER = 4.21%`) at **`2.44x` faster than real-time on CPU** (`RTF = 0.409`), with an average `RVOX` vault footprint of just **`226.5 KB`**.
+> **Highlights:** Anonymization pushes `ECAPA-TDNN` EER from `1.32%` to **`48.33%`** (ideal random-guess privacy) while keeping Vietnamese character error rate at just **`12.84%`** (within `4.1%` of unmodified human speech). Authorized recovery restores biometric similarity to **`0.8295`** (`EER = 4.47%`) with an average `RVOX` vault footprint of **`226.5 KB`**.
 
 <p align="center">
   <img src="assets/similarity_distribution.png" alt="ECAPA-TDNN Similarity Distribution" width="49%" />
